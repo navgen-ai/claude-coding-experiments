@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Trading Bot Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .grid-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .pair-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .stop-options {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .stop-options.visible {
+            display: block;
+        }
+
+        #priceChart {
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+
+        #gridOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .trades-table th,
+        .trades-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .trades-table th {
+            background-color: #f8f9fa;
+        }
+
+        .error {
+            color: red;
+            margin-top: 5px;
+        }
+
+        .success {
+            color: green;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Grid Trading Bot Manager</h1>
+            
+            <div class="grid-info">
+                <h3>About Grid Trading</h3>
+                <p>Grid trading is a strategy that places multiple buy and sell orders at regular intervals above and below a set price. This strategy:</p>
+                <ul>
+                    <li>Works best in sideways markets with regular price oscillations</li>
+                    <li>Automates buying low and selling high within a price range</li>
+                    <li>Requires careful consideration of grid spacing and position sizes</li>
+                    <li>May need adjustment in trending markets</li>
+                </ul>
+                <p><strong>Note:</strong> Always start with small position sizes while testing your strategy.</p>
+            </div>
+
+            <div class="pair-selector">
+                <select id="tradingPair" style="width: auto;">
+		    <option value="ethbtc">ETH/BTC</option>
+		    <option value="btcusdt">BTC/USDT</option>
+		    <option value="ethusdt">ETH/USDT</option>
+		    <option value="solusdt">SOL/USDT</option>
+		</select>
+                <button onclick="startStreaming()">Watch Pair</button>
+            </div>
+
+            <div id="priceChart">
+                <canvas id="mainChart"></canvas>
+                <canvas id="gridOverlay"></canvas>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <h3>Grid Parameters</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="upperPrice">Upper Price:</label>
+                        <input type="number" id="upperPrice" min="0" step="0.00001">
+                    </div>
+                    <div class="form-group">
+                        <label for="lowerPrice">Lower Price:</label>
+                        <input type="number" id="lowerPrice" min="0" step="0.00001">
+                    </div>
+                    <div class="form-group">
+                        <label for="gridLines">Number of Grid Lines:</label>
+                        <input type="number" id="gridLines" min="2" max="50" value="10">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="investment">Total Investment:</label>
+                        <input type="number" id="investment" min="0" step="0.00001">
+                    </div>
+                    <div class="form-group">
+                        <label for="profitPerGrid">Profit Per Grid (%):</label>
+                        <input type="number" id="profitPerGrid" min="0.1" step="0.1" value="1">
+                    </div>
+                </div>
+                <button onclick="setParameters()">Set Parameters</button>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <h3>API Configuration</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="apiKey">API Key:</label>
+                        <input type="text" id="apiKey" placeholder="Enter your Binance.us API Key">
+                    </div>
+                    <div class="form-group">
+                        <label for="apiSecret">API Secret:</label>
+                        <input type="text" id="apiSecret" placeholder="Enter your Binance.us API Secret">
+                    </div>
+                </div>
+                <button id="startBot" onclick="startBot()">Start Grid Bot</button>
+                <button id="stopBot" onclick="toggleStopOptions()" disabled>Stop Bot</button>
+                
+                <div id="stopOptions" class="stop-options">
+                    <h4>Stop Options:</h4>
+                    <div>
+                        <input type="radio" id="stopImmediate" name="stopType" value="immediate">
+                        <label for="stopImmediate">Stop Immediately (Cancel all orders)</label>
+                    </div>
+                    <div>
+                        <input type="radio" id="stopGraceful" name="stopType" value="graceful">
+                        <label for="stopGraceful">Graceful Stop (Complete open orders)</label>
+                    </div>
+                    <div>
+                        <input type="radio" id="stopPause" name="stopType" value="pause">
+                        <label for="stopPause">Pause (Suspend new orders)</label>
+                    </div>
+                    <button onclick="executeStop()">Confirm Stop</button>
+                </div>
+            </div>
+
+            <div id="status"></div>
+        </div>
+
+        <div class="card">
+            <h2>Recent Trades</h2>
+            <table class="trades-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Price</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tradesBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script>
+        let priceChart;
+	let websocket;
+	let isRunning = false;
+	let gridOrders = [];
+	let currentPrice = 0;
+	let chartInitialized = false;
+	let lastUpdateTime = 0;
+	let priceData = {
+	    rawData: [], // Store raw price data with timestamps
+	    aggregatedData: [], // Store 10-second averages
+	    lastAggregation: 0
+	};
+
+	// Modified chart initialization
+	function initChart() {
+	    if (chartInitialized) return;
+	    
+	    const canvas = document.getElementById('mainChart');
+	    const ctx = canvas.getContext('2d');
+	    
+	    if (priceChart) {
+		priceChart.destroy();
+	    }
+	    
+	    priceChart = new Chart(ctx, {
+		type: 'line',
+		data: {
+		    labels: [],
+		    datasets: [{
+		        label: 'Price',
+		        data: [],
+		        borderColor: '#4CAF50',
+		        borderWidth: 2,
+		        fill: false,
+		        tension: 0.1
+		    }]
+		},
+		options: {
+		    responsive: true,
+		    maintainAspectRatio: false,
+		    scales: {
+		        y: {
+		            type: 'linear',
+		            position: 'right',
+		            grid: {
+		                color: 'rgba(0, 0, 0, 0.1)'
+		            }
+		        },
+		        x: {
+		            type: 'category',
+		            grid: {
+		                display: false
+		            },
+		            ticks: {
+		                maxTicksLimit: 12,  // Show one tick per 5 minutes (10 minute window / 5)
+		                callback: function(val, index) {
+		                    // Only show tick if it's a multiple of 5 minutes
+		                    const time = this.getLabelForValue(val);
+		                    const date = new Date(`1970-01-01T${time}`);
+		                    const minutes = date.getMinutes();
+		                    return minutes % 5 === 0 ? time : '';
+		                }
+		            }
+		        }
+		    },
+		    animation: false,
+		    plugins: {
+		        legend: {
+		            display: false
+		        }
+		    }
+		}
+	    });
+	    
+	    chartInitialized = true;
+	}
+
+	// Start streaming prices
+	function startStreaming() {
+	    const tradingPair = document.getElementById('tradingPair').value;
+	    
+	    // Initialize or reset chart
+	    if (!chartInitialized) {
+		initChart();
+	    } else {
+		// Clear existing data
+		priceChart.data.labels = [];
+		priceChart.data.datasets[0].data = [];
+		priceChart.update('none');
+	    }
+
+	    // Setup WebSocket connection
+	    setupWebSocket(tradingPair);
+	}
+
+	// Setup WebSocket connection
+	function setupWebSocket(symbol) {
+	    if (websocket) {
+		websocket.close();
+	    }
+
+	    websocket = new WebSocket('wss://stream.binance.us:9443/ws');
+	    let pingInterval;
+
+	    websocket.onopen = () => {
+		console.log('WebSocket connected');
+		
+		const subscribeMessage = {
+		    method: "SUBSCRIBE",
+		    params: [
+		        `${symbol.toLowerCase()}@bookTicker`
+		    ],
+		    id: Date.now()
+		};
+		console.log('Sending subscription:', subscribeMessage);
+		websocket.send(JSON.stringify(subscribeMessage));
+
+		pingInterval = setInterval(() => {
+		    if (websocket.readyState === WebSocket.OPEN) {
+		        websocket.send(JSON.stringify({ ping: Date.now() }));
+		    }
+		}, 30000);
+
+		showStatus('Connected to price stream', 'success');
+	    };
+
+	    websocket.onmessage = (event) => {
+		try {
+		    const data = JSON.parse(event.data);
+		    
+		    if (data.b) {  // Check if we have a bid price
+		        const price = parseFloat(data.b);  // best bid price
+		        
+		        // Throttle updates to once per second
+		        const now = Date.now();
+		        if (now - lastUpdateTime >= 1000) {  // Only update every 1000ms
+		            console.log('Updating with price:', price);
+		            if (price && !isNaN(price)) {
+		                currentPrice = price;
+		                updatePrice(price);
+		                lastUpdateTime = now;
+		            }
+		        }
+		    } else if (data.pong) {
+		        console.log('Received pong');
+		    }
+		} catch (error) {
+		    console.error('Error processing message:', error);
+		    console.log('Raw message:', event.data);
+		}
+	    };
+
+	    websocket.onclose = (event) => {
+		console.log('WebSocket closed:', event.code, event.reason);
+		clearInterval(pingInterval);
+		
+		// Only reconnect if not intentionally closed
+		if (event.code !== 1000) {
+		    setTimeout(() => setupWebSocket(symbol), 5000);
+		}
+	    };
+
+	    websocket.onerror = (error) => {
+		console.error('WebSocket Error:', error);
+		showStatus('Connection error', 'error');
+	    };
+	}
+
+	// Update price chart with smoothing and aggregation
+	function updatePrice(price) {
+	    if (!chartInitialized || !priceChart) {
+		console.error('Chart not initialized');
+		return;
+	    }
+
+	    const now = Date.now();
+	    const timeStr = new Date(now).toLocaleTimeString();
+
+	    try {
+		// Add to raw data
+		priceData.rawData.push({
+		    timestamp: now,
+		    price: price
+		});
+
+		// Remove data older than 10 minutes
+		const tenMinutesAgo = now - (10 * 60 * 1000);
+		priceData.rawData = priceData.rawData.filter(d => d.timestamp > tenMinutesAgo);
+
+		// Aggregate data every 10 seconds
+		if (now - priceData.lastAggregation >= 10000) {
+		    aggregateData(now);
+		    priceData.lastAggregation = now;
+		}
+
+		// Combine recent raw data with aggregated data
+		const recentData = priceData.rawData.filter(d => d.timestamp > now - 10000);
+		const combinedData = [...priceData.aggregatedData, ...recentData];
+
+		// Update chart with combined data
+		priceChart.data.labels = combinedData.map(d => 
+		    new Date(d.timestamp).toLocaleTimeString());
+		priceChart.data.datasets[0].data = combinedData.map(d => 
+		    typeof d.price === 'number' ? d.price : d.average);
+
+		// Update y-axis range
+		const prices = combinedData.map(d => typeof d.price === 'number' ? d.price : d.average);
+		const minPrice = Math.min(...prices);
+		const maxPrice = Math.max(...prices);
+		const padding = (maxPrice - minPrice) * 0.1;
+		
+		priceChart.options.scales.y.min = minPrice - padding;
+		priceChart.options.scales.y.max = maxPrice + padding;
+
+		// Update grid lines if they exist
+		if (gridOrders.length > 0) {
+		    drawGridLines(gridOrders);
+		}
+
+		// Force chart update
+		requestAnimationFrame(() => {
+		    priceChart.update('none');
+		});
+
+	    } catch (error) {
+		console.error('Error updating chart:', error);
+	    }
+	}
+	
+	// Aggregate data into 10-second windows
+	function aggregateData(currentTime) {
+	    const windowSize = 10000; // 10 seconds
+	    const oldestTime = currentTime - (10 * 60 * 1000); // 10 minutes ago
+	    
+	    // Group data into 10-second windows
+	    const windows = {};
+	    priceData.rawData.forEach(d => {
+		if (d.timestamp <= currentTime - windowSize) { // Don't aggregate recent data
+		    const windowStart = Math.floor(d.timestamp / windowSize) * windowSize;
+		    if (!windows[windowStart]) {
+		        windows[windowStart] = [];
+		    }
+		    windows[windowStart].push(d.price);
+		}
+	    });
+
+	    // Calculate averages for each window
+	    priceData.aggregatedData = Object.entries(windows)
+		.map(([timestamp, prices]) => ({
+		    timestamp: parseInt(timestamp),
+		    average: prices.reduce((a, b) => a + b) / prices.length
+		}))
+		.filter(d => d.timestamp > oldestTime)
+		.sort((a, b) => a.timestamp - b.timestamp);
+	}
+
+	// Set grid parameters and display overlay
+	function setParameters() {
+	    const gridLevels = calculateGridLevels();
+	    if (!gridLevels) return;
+
+	    drawGridLines(gridLevels.levels);
+	    showStatus('Grid parameters set successfully', 'success');
+	}
+
+	// Calculate grid levels
+	function calculateGridLevels() {
+	    const upperPrice = parseFloat(document.getElementById('upperPrice').value);
+	    const lowerPrice = parseFloat(document.getElementById('lowerPrice').value);
+	    const gridLines = parseInt(document.getElementById('gridLines').value);
+	    const investment = parseFloat(document.getElementById('investment').value);
+	    const profitPerGrid = parseFloat(document.getElementById('profitPerGrid').value);
+
+	    if (!upperPrice || !lowerPrice || !gridLines || !investment || !profitPerGrid) {
+		showStatus('Please fill in all grid parameters', 'error');
+		return null;
+	    }
+
+	    if (upperPrice <= lowerPrice) {
+		showStatus('Upper price must be greater than lower price', 'error');
+		return null;
+	    }
+
+	    const priceStep = (upperPrice - lowerPrice) / (gridLines - 1);
+	    const amountPerGrid = investment / gridLines;
+
+	    return {
+		levels: Array.from({length: gridLines}, (_, i) => ({
+		    price: lowerPrice + (i * priceStep),
+		    amount: amountPerGrid,
+		    profit: profitPerGrid
+		}))
+	    };
+	}
+
+	// Modified grid lines drawing function
+	function drawGridLines(levels) {
+	    if (!chartInitialized || !priceChart) return;
+
+	    const canvas = document.getElementById('gridOverlay');
+	    const ctx = canvas.getContext('2d');
+	    
+	    // Set canvas size to match chart
+	    canvas.width = priceChart.canvas.width;
+	    canvas.height = priceChart.canvas.height;
+	    
+	    ctx.clearRect(0, 0, canvas.width, canvas.height);
+	    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+	    ctx.setLineDash([5, 5]);
+	    ctx.lineWidth = 1;
+
+	    levels.forEach(level => {
+		const y = priceChart.scales.y.getPixelForValue(level.price);
+		if (y >= 0 && y <= canvas.height) {  // Only draw if within canvas bounds
+		    ctx.beginPath();
+		    ctx.moveTo(0, y);
+		    ctx.lineTo(canvas.width, y);
+		    ctx.stroke();
+		}
+	    });
+	}
+
+	// Toggle stop options menu
+	function toggleStopOptions() {
+	    const stopOptions = document.getElementById('stopOptions');
+	    stopOptions.classList.toggle('visible');
+	}
+
+	// Execute selected stop option
+	function executeStop() {
+	    const selectedOption = document.querySelector('input[name="stopType"]:checked');
+	    if (!selectedOption) {
+		showStatus('Please select a stop option', 'error');
+		return;
+	    }
+
+	    switch (selectedOption.value) {
+		case 'immediate':
+		    stopBot(true);
+		    break;
+		case 'graceful':
+		    stopBot(false, true);
+		    break;
+		case 'pause':
+		    pauseBot();
+		    break;
+	    }
+	}
+
+	// Start the grid bot
+	function startBot() {
+	    const apiKey = document.getElementById('apiKey').value;
+	    const apiSecret = document.getElementById('apiSecret').value;
+
+	    if (!apiKey || !apiSecret) {
+		showStatus('Please enter API credentials', 'error');
+		return;
+	    }
+
+	    const gridLevels = calculateGridLevels();
+	    if (!gridLevels) return;
+
+	    gridOrders = gridLevels.levels;
+	    isRunning = true;
+	    
+	    document.getElementById('startBot').disabled = true;
+	    document.getElementById('stopBot').disabled = false;
+	    
+	    showStatus('Grid bot started successfully', 'success');
+	}
+
+	// Stop the grid bot
+	function stopBot(immediate = false, graceful = false) {
+	    if (immediate) {
+		gridOrders = [];
+		isRunning = false;
+	    } else if (graceful) {
+		isRunning = false;
+	    }
+	    
+	    document.getElementById('startBot').disabled = false;
+	    document.getElementById('stopBot').disabled = true;
+	    document.getElementById('stopOptions').classList.remove('visible');
+	    
+	    showStatus(`Grid bot stopped (${immediate ? 'Immediate' : graceful ? 'Graceful' : 'Normal'})`, 'success');
+	}
+
+	// Pause the grid bot
+	function pauseBot() {
+	    isRunning = false;
+	    document.getElementById('stopOptions').classList.remove('visible');
+	    showStatus('Grid bot paused - no new orders will be placed', 'success');
+	}
+
+	// Check if price crosses any grid levels
+	function checkGridOrders(currentPrice) {
+	    if (!isRunning) return;
+
+	    gridOrders.forEach((level, index) => {
+		const priceDiff = Math.abs(currentPrice - level.price) / level.price * 100;
+		
+		if (priceDiff < 0.1) { // Within 0.1% of grid level
+		    const type = currentPrice > level.price ? 'SELL' : 'BUY';
+		    const amount = calculateOrderAmount(level.amount, currentPrice);
+		    
+		    executeTrade(type, currentPrice, amount, level);
+		}
+	    });
+	}
+
+	// Calculate order amount based on investment per grid
+	function calculateOrderAmount(gridAmount, currentPrice) {
+	    const tradingPair = document.getElementById('tradingPair').value;
+	    if (tradingPair === 'ethbtc') {
+		return gridAmount / currentPrice;
+	    }
+	    return gridAmount;
+	}
+
+	// Execute trade at grid level
+	function executeTrade(type, price, amount, level) {
+	    addTradeRecord(type, price, amount);
+	    const profit = type === 'SELL' ? 
+		(price - level.price) * amount :
+		(level.price - price) * amount;
+	    updateProfitDisplay(profit);
+	}
+
+	// Add trade record to the table
+	function addTradeRecord(type, price, amount) {
+	    const table = document.getElementById('tradesBody');
+	    const row = table.insertRow(0);
+	    
+	    const tradingPair = document.getElementById('tradingPair').value;
+	    const amountDisplay = tradingPair === 'ethbtc' ? 
+		`${amount.toFixed(8)} ETH` :
+		`$${amount.toFixed(2)}`;
+	    
+	    row.innerHTML = `
+		<td>${new Date().toLocaleString()}</td>
+		<td>${type}</td>
+		<td>${price.toFixed(tradingPair === 'ethbtc' ? 8 : 2)}</td>
+		<td>${amountDisplay}</td>
+		<td>Executed</td>
+	    `;
+
+	    if (table.rows.length > 50) {
+		table.deleteRow(-1);
+	    }
+	}
+
+	// Update profit display
+	let totalProfit = 0;
+	function updateProfitDisplay(profit) {
+	    totalProfit += profit;
+	    
+	    let profitDisplay = document.getElementById('profitDisplay');
+	    if (!profitDisplay) {
+		profitDisplay = document.createElement('div');
+		profitDisplay.id = 'profitDisplay';
+		document.getElementById('status').parentNode.insertBefore(
+		    profitDisplay,
+		    document.getElementById('status')
+		);
+	    }
+
+	    const tradingPair = document.getElementById('tradingPair').value;
+	    const profitString = tradingPair === 'ethbtc' ? 
+		`${totalProfit.toFixed(8)} BTC` :
+		`$${totalProfit.toFixed(2)}`;
+	    
+	    profitDisplay.innerHTML = `Total Profit: ${profitString}`;
+	    profitDisplay.style.color = totalProfit >= 0 ? 'green' : 'red';
+	}
+
+	// Show status messages
+	function showStatus(message, type) {
+	    const status = document.getElementById('status');
+	    status.textContent = message;
+	    status.className = type;
+	}
+
+	// Add event listener for trading pair changes
+	document.getElementById('tradingPair').addEventListener('change', startStreaming);
+
+	// Initialize on page load
+	document.addEventListener('DOMContentLoaded', () => {
+	    initChart();
+	    startStreaming();
+	});
+
+	// Handle window resize for chart overlay
+	window.addEventListener('resize', () => {
+	    if (gridOrders.length > 0) {
+		drawGridLines(gridOrders);
+	    }
+	});
+    </script>
+</body>
+</html>

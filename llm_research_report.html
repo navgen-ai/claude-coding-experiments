@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Research Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #0052a3;
+        }
+
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+        }
+
+        #report {
+            margin-top: 2rem;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .error {
+            color: #dc3545;
+            background: #ffe6e6;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+
+        .progress-container {
+            margin-top: 1rem;
+        }
+
+        .progress-step {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+
+        .progress-step.completed {
+            background: #d4edda;
+        }
+
+        .progress-step.reflection {
+            background: #e2e3e5;
+            margin-left: 1rem;
+            font-size: 0.9em;
+        }
+
+        #downloadBtn {
+            background: #28a745;
+            margin-top: 1rem;
+        }
+
+        #downloadBtn:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LLM Research Report Generator</h1>
+        
+        <div class="input-group">
+            <label for="apiKey">OpenAI API Key:</label>
+            <input type="text" id="apiKey" placeholder="sk-..." required>
+        </div>
+
+        <div class="input-group">
+            <label for="query">What would you like to research?</label>
+            <textarea id="query" placeholder="Enter your research question or topic" required></textarea>
+        </div>
+
+        <div class="input-group">
+            <label for="audience">Target Audience:</label>
+            <textarea id="audience" placeholder="Describe your target audience" required></textarea>
+        </div>
+
+        <button id="generateBtn" onclick="generateReport()">Generate Research</button>
+        <button id="downloadBtn" onclick="downloadReport()" style="display: none;">Download Report</button>
+
+        <div id="status"></div>
+        <div class="progress-container" id="progress"></div>
+        <div id="report"></div>
+    </div>
+
+    <script>
+        let enhancedQuery = '';
+        let framework = '';
+        let currentReport = '';
+
+        async function generateReport() {
+            const apiKey = document.getElementById('apiKey').value;
+            const query = document.getElementById('query').value;
+            const audience = document.getElementById('audience').value;
+            
+            if (!apiKey || !query || !audience) {
+                showError('Please fill in all fields');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+            
+            try {
+                // Step 1: Enhance the query
+                updateProgress('Query Enhancement', 'Starting...');
+                enhancedQuery = await enhanceUserQuery(query, audience, apiKey);
+                framework = await determineFramework(apiKey);
+                updateProgress('Query Enhancement', 'Completed');
+
+                // Step 2: Generate and refine full report
+                currentReport = await generateAndRefineReport(apiKey);
+
+                // Display the report
+                document.getElementById('report').innerHTML = marked.parse(currentReport);
+                document.getElementById('downloadBtn').style.display = 'inline-block';
+                
+            } catch (error) {
+                showError('Error generating report: ' + error.message);
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Research';
+            }
+        }
+
+        async function enhanceUserQuery(query, audience, apiKey) {
+            const prompt = `Analyze this research query and provide a comprehensive, detailed version that captures all aspects requiring investigation.
+                           Original query: "${query}"
+                           Target audience: "${audience}"
+                           Provide an enhanced version that clearly states what needs to be researched and understood.`;
+
+            const response = await makeAPIRequest(apiKey, prompt);
+            return response;
+        }
+        
+        async function determineFramework(apiKey) {
+            const prompt = `Choose an appropriate research framework for answering the query. Below are some suggested frameworks:
+Beginner's Learning Journey:
+KWHL Framework (Know, Want to know, How to find out, Learned)
+SQ3R (Survey, Question, Read, Recite, Review)
+KWL Plus (Know, Want to know, Learned + Mapping & Summarizing)
+CLEAR Method (Clarify, Learn, Engage, Apply, Reflect)
+5W1H Framework (Who, What, When, Where, Why, How)
+
+Real-World Problem Solving:
+DMAIC (Define, Measure, Analyze, Improve, Control)
+Design Thinking Framework (Empathize, Define, Ideate, Prototype, Test)
+PDCA Cycle (Plan, Do, Check, Act)
+8D Problem Solving (8 Disciplines)
+GROWS Model (Goal, Reality, Options, Will, Success/Strategy)
+
+Quantitative/Evidence-based Research:
+GRADE Framework (Grading of Recommendations Assessment, Development and Evaluation)
+Campbell Collaboration Framework
+PICO Framework (Population, Intervention, Comparison, Outcome)
+JBI Framework (Joanna Briggs Institute)
+
+Software/Product Development:
+Design Science Research Methodology (DSRM)
+
+Comprehensive Understanding:
+Systems Thinking Framework
+Bloom's Taxonomy
+ADDIE Model (Analysis, Design, Development, Implementation, Evaluation)
+4MAT System (Experience, Conceptualize, Apply, Create)
+Understanding by Design (UbD)
+
+Cause-Effect Analysis:
+Ishikawa (Fishbone) Diagram Method
+Root Cause Analysis (RCA)
+5 Whys Framework
+Fault Tree Analysis (FTA)
+Causal Loop Diagrams (CLD)
+
+Mathematical Modeling:
+ADMP Framework (Analysis, Design, Model, Predict)
+Monte Carlo Simulation Framework
+Analytical Hierarchy Process (AHP)
+System Dynamics Modeling
+DOE Framework (Design of Experiments)
+            
+When choosing a research framework, consider:
+ - Research objectives
+ - Available resources
+ - Type of data needed
+ - Stakeholder expectations
+ 
+Query:
+"${enhancedQuery}"
+
+Respond with the best research framework.
+`	    
+
+	    const response = await makeAPIRequest(apiKey, prompt);
+            return response;
+        
+        }
+        
+        async function generateAndRefineReport(apiKey) {
+            let bestReport = '';
+            let currentReport = '';
+            let iterationCount = 0;
+            const maxIterations = 3;
+            
+            const initialReportPrompt = `
+Research Query: "${enhancedQuery}
+Research Framework: "${framework}"
+
+Generate a comprehensive research report using the framework.
+Important guidelines:
+  - Focus on providing specific, detailed information and answers rather than explanations or methodology
+  - Include concrete examples, data, and evidence where applicable
+  - Ensure all information directly answers the research query
+  - Format the response in Markdown with clear section headers
+  - Data should be presented in tables
+  - The report should be exceptionally thorough
+  - Under no circumstances should you include case studies
+`
+	    updateProgress('Report Generation', `Initial`);
+	    currentReport = await makeAPIRequest(apiKey, initialReportPrompt);
+	    
+            do {
+                iterationCount++;
+                updateProgress('Report Generation', `Iteration ${iterationCount}`);
+                
+                if (!bestReport || currentReport.length > bestReport.length) {
+                    bestReport = currentReport;
+                }
+
+                // Self-reflection
+                const reflectionPrompt = `
+Review this research report for completeness and accuracy:
+
+${currentReport}
+
+Is this the most comprehensive and accurate report possible? Consider:
+ - Are all relevant aspects of the query addressed?
+ - Are there any missing important details or examples?
+ - Is the information specific and concrete enough?
+ - Are there any sections that could be expanded or clarified?
+ - Is there any data presented which is not presented in a table but could be?
+ - Does the report suggest that it includes items it does not?
+ - Under no circumstances should the report include case studies.
+
+If this is the best possible report, respond with "YES".
+If not, provide a numbered list of specific improvements needed (focus on content, not format).`;
+
+                const reflection = await makeAPIRequest(apiKey, reflectionPrompt);
+                updateProgress('Report Reflection', 
+                    `Iteration ${iterationCount} - ${reflection.substring(0, 100)}...`);
+
+                if (reflection.trim().toUpperCase().startsWith('YES')) {
+                    return currentReport;
+                }
+                
+                // Improve the report
+                const improvePrompt = `
+Draft Research Report:
+${currentReport}
+
+Required Improvements:
+${reflection}
+
+Please make the Required Improvements to the Research Report and provide only the improved report. The end user should not be aware of the report's iterations. Therefore make no mention of the report being improved or revised. Simply make the improvements and present the report as if it were final.
+`
+		currentReport = await makeAPIRequest(apiKey, improvePrompt);
+
+            } while (iterationCount < maxIterations);
+
+            return bestReport;
+        }
+
+        async function makeAPIRequest(apiKey, prompt) {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-3.5-turbo',  // 'gpt-4',
+                    messages: [{
+                        role: 'user',
+                        content: prompt
+                    }],
+                    temperature: 0.0
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('API request failed');
+            }
+
+            const data = await response.json();
+            return data.choices[0].message.content;
+        }
+
+        function downloadReport() {
+            const blob = new Blob([currentReport], { type: 'text/markdown' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'research-report.md';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function updateProgress(step, status) {
+            const progressDiv = document.getElementById('progress');
+            const stepDiv = document.createElement('div');
+            stepDiv.className = status.includes('Iteration') ? 
+                'progress-step reflection' : 'progress-step completed';
+            stepDiv.textContent = `${step}: ${status}`;
+            progressDiv.appendChild(stepDiv);
+        }
+
+        function showError(message) {
+            const status = document.getElementById('status');
+            status.className = 'error';
+            status.textContent = message;
+        }
+    </script>
+</body>
+</html>

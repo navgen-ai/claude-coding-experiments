@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background-color: #f5f5f5;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        h1 {
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+            font-weight: 500;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .task-metrics {
+            background-color: #f7fafc;
+            padding: 1.5rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+        }
+
+        .metric-input {
+            margin-bottom: 1rem;
+        }
+
+        .help-text {
+            font-size: 0.875rem;
+            color: #718096;
+            margin-top: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background-color: #4299e1;
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            margin-left: 0.5rem;
+            cursor: help;
+            position: relative;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 100%;
+            margin-bottom: 10px;
+            width: 300px;
+            background-color: #2d3748;
+            color: white;
+            text-align: left;
+            padding: 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #2d3748 transparent transparent transparent;
+        }
+
+        .info-icon:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip ul {
+            margin: 0.5rem 0 0 1.25rem;
+            padding: 0;
+        }
+
+        .tooltip li {
+            margin-bottom: 0.5rem;
+        }
+
+        .assumptions {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #f0fff4;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #2f855a;
+        }
+
+        .results {
+            margin-top: 2rem;
+            display: none;
+        }
+
+        .metric {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background-color: #ebf8ff;
+            border-radius: 4px;
+        }
+
+        .metric-label {
+            font-weight: 600;
+            color: #2c5282;
+        }
+
+        .metric-value {
+            font-size: 1.25rem;
+            color: #2b6cb0;
+            margin: 0.5rem 0;
+        }
+
+        .sub-detail {
+            font-size: 0.875rem;
+            color: #4a5568;
+            margin-top: 0.25rem;
+        }
+
+        /* Make tooltip stay visible on mobile */
+        @media (max-width: 768px) {
+            .tooltip {
+                width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Marketing Task Automation ROI Calculator</h1>
+        
+        <div class="input-group">
+            <label>Select Marketing Task to Automate</label>
+            <select id="taskSelect" onchange="updateTaskDetails()">
+                <option value="email">Email Campaign Management</option>
+                <option value="social">Social Media Scheduling</option>
+                <option value="reporting">Marketing Analytics Reporting</option>
+                <option value="content">Content Calendar Management</option>
+                <option value="leads">Lead Scoring and Routing</option>
+                <option value="ab">A/B Testing Management</option>
+            </select>
+            <div class="help-text">Select a task to populate with suggested values, or enter your own metrics below.</div>
+        </div>
+
+        <div class="task-metrics">
+            <div class="metric-input">
+                <label>Hours Per Week</label>
+                <input type="number" id="timePerWeek" min="0" step="0.5">
+                <div class="help-text">Total time currently spent on this task per week</div>
+            </div>
+            <div class="metric-input">
+                <label>Hourly Cost ($)</label>
+                <input type="number" id="hourlyCost" min="0">
+                <div class="help-text">Fully-loaded cost per hour (salary + benefits)</div>
+            </div>
+            <div class="metric-input">
+                <label>
+                    Expected Efficiency Gain (%)
+                    <span class="info-icon">i
+                        <div class="tooltip">
+                            Typical efficiency gains by task type:
+                            <ul>
+                                <li><strong>80-90%:</strong> Repetitive data entry, report generation, basic email responses</li>
+                                <li><strong>60-80%:</strong> Content scheduling, campaign management, analytics reporting</li>
+                                <li><strong>40-60%:</strong> Content creation assistance, audience segmentation</li>
+                                <li><strong>20-40%:</strong> Creative tasks, strategy development, customer interactions</li>
+                            </ul>
+                        </div>
+                    </span>
+                </label>
+                <input type="number" id="efficiency" min="0" max="100">
+                <div class="help-text">Percentage of time that could be saved through automation</div>
+            </div>
+        </div>
+
+        <div class="assumptions">
+            <strong>Fixed Automation Costs:</strong>
+            <div>Initial Implementation: $5,000</div>
+            <div>Monthly Maintenance: $500</div>
+        </div>
+
+        <div class="results" id="results">
+            <div class="metric">
+                <div class="metric-label">Annual Investment</div>
+                <div class="metric-value" id="annualInvestment">$0</div>
+                <div class="sub-detail">($5,000 implementation + $6,000 maintenance)</div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-label">Annual Labor Cost Savings</div>
+                <div class="metric-value" id="annualSavings">$0</div>
+                <div class="sub-detail" id="savingsBreakdown"></div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-label">Net Annual Benefit</div>
+                <div class="metric-value" id="netBenefit">$0</div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-label">Return on Investment</div>
+                <div class="metric-value" id="roi">0%</div>
+                <div class="sub-detail">(Net Annual Benefit ÷ Annual Investment) × 100</div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-label">Months to Break Even</div>
+                <div class="metric-value" id="payback">0</div>
+                <div class="sub-detail">Initial cost ÷ (Monthly savings - Monthly maintenance)</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Previous JavaScript remains the same
+        const taskData = {
+            email: { timePerWeek: 10, hourlyCost: 40, efficiency: 70 },
+            social: { timePerWeek: 8, hourlyCost: 40, efficiency: 60 },
+            reporting: { timePerWeek: 6, hourlyCost: 50, efficiency: 80 },
+            content: { timePerWeek: 8, hourlyCost: 45, efficiency: 65 },
+            leads: { timePerWeek: 12, hourlyCost: 55, efficiency: 75 },
+            ab: { timePerWeek: 5, hourlyCost: 50, efficiency: 70 }
+        };
+
+        function updateTaskDetails() {
+            const selectedTask = document.getElementById('taskSelect').value;
+            const task = taskData[selectedTask];
+            
+            document.getElementById('timePerWeek').value = task.timePerWeek;
+            document.getElementById('hourlyCost').value = task.hourlyCost;
+            document.getElementById('efficiency').value = task.efficiency;
+
+            calculateROI();
+        }
+
+        function calculateROI() {
+            const hoursPerWeek = parseFloat(document.getElementById('timePerWeek').value);
+            const hourlyCost = parseFloat(document.getElementById('hourlyCost').value);
+            const efficiency = parseFloat(document.getElementById('efficiency').value) / 100;
+            
+            // Annual calculations
+            const annualHours = hoursPerWeek * 52;
+            const hoursSaved = annualHours * efficiency;
+            const annualSavings = hoursSaved * hourlyCost;
+            
+            const annualInvestment = 5000 + (500 * 12); // Initial + maintenance
+            const netAnnualBenefit = annualSavings - annualInvestment;
+            const roi = (netAnnualBenefit / annualInvestment) * 100;
+            
+            // Monthly calculations for payback
+            const monthlySavings = annualSavings / 12;
+            const paybackPeriod = 5000 / (monthlySavings - 500);
+
+            // Display results
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('annualInvestment').textContent = formatCurrency(annualInvestment);
+            document.getElementById('annualSavings').textContent = formatCurrency(annualSavings);
+            document.getElementById('savingsBreakdown').textContent = 
+                `(${hoursSaved.toFixed(0)} hours × $${hourlyCost}/hr)`;
+            document.getElementById('netBenefit').textContent = formatCurrency(netAnnualBenefit);
+            document.getElementById('roi').textContent = `${roi.toFixed(1)}%`;
+            document.getElementById('payback').textContent = 
+                isFinite(paybackPeriod) ? `${paybackPeriod.toFixed(1)}` : "N/A";
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+
+        // Initialize with first task
+        updateTaskDetails();
+
+        // Add event listeners to all inputs for real-time updates
+        document.getElementById('timePerWeek').addEventListener('input', calculateROI);
+        document.getElementById('hourlyCost').addEventListener('input', calculateROI);
+        document.getElementById('efficiency').addEventListener('input', calculateROI);
+    </script>
+</body>
+</html>
